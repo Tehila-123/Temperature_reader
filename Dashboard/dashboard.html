@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tehila</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@2.0.0/dist/chartjs-plugin-streaming.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@2.3.0/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.1.0/dist/chartjs-adapter-luxon.min.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 980px; margin:auto; background:#f6f7fb; padding:20px; }
+    .card { background:#fff; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.08); padding:18px; margin:16px 0; }
+    #status { font-weight:700; padding:12px; border-radius:10px; text-align:center; }
+    .ok { background:#d4edda; color:#155724; }
+    .bad { background:#f8d7da; color:#721c24; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .big { font-size:2.2em; font-weight:800; }
+    button { padding:12px 16px; border:none; border-radius:10px; font-size:16px; cursor:pointer; }
+    .on { background:#16a34a; color:#fff; }
+    .off { background:#dc2626; color:#fff; }
+    .chart { height:340px; }
+    .muted { color:#6b7280; font-size:12px; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>🌡️ Tehila</h1>
+    <div class="muted">
+      Topics: tehila/esp8266/dht • tehila/esp8266/led/set • tehila/esp8266/led/status • iot/status/esp8266_tehila
+    </div>
+  </div>
+
+  <div id="status" class="bad">Connecting…</div>
+
+  <div class="grid">
+    <div class="card" style="text-align:center;">
+      <h3>Temperature</h3>
+      <div class="big" id="temp">--</div>
+      <div>°C</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h3>Humidity</h3>
+      <div class="big" id="hum">--</div>
+      <div>%</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>:satellite_antenna: Status</h3>
+    <p><b>Device:</b> <span id="dev">unknown</span></p>
+    <p><b>LED:</b> <span id="led">unknown</span></p>
+    <p class="muted" id="last">Waiting for data…</p>
+  </div>
+
+  <div class="card">
+    <h3>:bulb: LED Control</h3>
+    <button class="on" onclick="sendLED('ON')">Turn ON</button>
+    <button class="off" onclick="sendLED('OFF')">Turn OFF</button>
+  </div>
+
+  <div class="card chart">
+    <canvas id="chart"></canvas>
+  </div>
+
+<script>
+  // ==========================
+  // EDIT THESE (MQTT WebSockets)
+  // ==========================
+  const WS_HOST = "broker.benax.rw";
+  const WS_PORT = 9001;     // Change if your broker uses a different WS port
+  const WS_PATH = "/mqtt";  // Change if your broker uses a different path
+  const USE_SSL = false;    // true for wss, false for ws
+
+  // If your broker requires login over WS, set strings.
+  // If you don't have login, keep them as empty strings "" (NOT null).
+  const WS_USER = "";       // e.g. "student"
+  const WS_PASS = "";       // e.g. "password"
+  // ==========================
+
+  const DEVICE_ID = "esp8266_tehila";
+
+  const TOPIC_LED_SET    = "tehila/esp8266/led/set";
+  const TOPIC_DATA       = "tehila/esp8266/dht";
+  const TOPIC_LED_STATUS = "tehila/esp8266/led/status";
+  const TOPIC_STATUS     = "iot/status/" + DEVICE_ID;
+
+  const clientID = "web_tehila_" + Math.random().toString(16).slice(2);
+
+  // :white_check_mark: Correct: include WS_PATH in constructor
+  const client = new Paho.MQTT.Client(WS_HOST, Number(WS_PORT), WS_PATH, clientID);
+
+  function setStatus(text, ok){
+    const el = document.getElementById("status");
+    el.textContent = text;
+    el.className = ok ? "ok" : "bad";
+  }
+
+  // Chart
+  const ctx = document.getElementById("chart").getContext("2d");
+  const chart = new Chart(ctx, {
+    type: "line",
+    data: { datasets: [{label:"Temp (°C)", data:[]}, {label:"Hum (%)", data:[]}] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type:"realtime", realtime:{ duration:60000, refresh:1000, delay:2000 } },
+        y: { beginAtZero:true, max:100 }
+      }
+    }
+  });
+
+  client.onMessageArrived = (m) => {
+    const t = m.destinationName;
+    const p = m.payloadString;
+
+    if (t === TOPIC_STATUS) {
+      document.getElementById("dev").textContent = p;
+      setStatus(p === "online" ? ":white_check_mark: Device online" : ":x: Device offline", p === "online");
+      return;
+    }
+
+    if (t === TOPIC_LED_STATUS) {
+      document.getElementById("led").textContent = p;
+      return;
+    }
+
+    if (t === TOPIC_DATA) {
+      const d = JSON.parse(p);
+      document.getElementById("temp").textContent = d.temperature;
+      document.getElementById("hum").textContent  = d.humidity;
+
+      const ts = d.ts ? new Date(d.ts * 1000) : new Date();
+      document.getElementById("last").textContent = "Last update: " + ts.toLocaleString();
+
+      const now = Date.now();
+      chart.data.datasets[0].data.push({x: now, y: Number(d.temperature)});
+      chart.data.datasets[1].data.push({x: now, y: Number(d.humidity)});
+      chart.update("quiet");
+    }
+  };
+
+  client.onConnectionLost = (e) => {
+    setStatus("Disconnected — retrying…", false);
+    setTimeout(connect, 3000);
+  };
+
+  function connect(){
+    setStatus("Connecting to MQTT WS…", false);
+
+    const opts = {
+      useSSL: USE_SSL,
+      timeout: 10,
+      onSuccess: () => {
+        setStatus(":white_check_mark: Dashboard connected (WS)", true);
+        client.subscribe(TOPIC_DATA);
+        client.subscribe(TOPIC_LED_STATUS);
+        client.subscribe(TOPIC_STATUS);
+      },
+      onFailure: (e) => {
+        setStatus(":x: WS connect failed: " + (e.errorMessage || ""), false);
+        setTimeout(connect, 3000);
+      }
+    };
+
+    if (typeof WS_USER === "string" && WS_USER.length > 0) {
+      opts.userName = WS_USER;
+      opts.password = WS_PASS;
+    }
+
+    client.connect(opts);
+  }
+
+  function sendLED(cmd){
+    if (!client.isConnected()) return alert("Dashboard not connected yet");
+    const msg = new Paho.MQTT.Message(cmd);
+    msg.destinationName = TOPIC_LED_SET;
+    client.send(msg);
+  }
+
+  connect();
+</script>
+
+</body>
+</html>

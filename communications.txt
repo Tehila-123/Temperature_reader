@@ -1,0 +1,5 @@
+The system uses three types of communication:
+
+Analog communication between the LM35 sensor and Arduino via ADC input.
+Serial (UART) communication between Arduino Uno and the PC via USB.
+MQTT communication over TCP/IP between the PC program and the MQTT broker on the VPS.

@@ -28,7 +28,7 @@ except AttributeError:
 BAUD_RATE = 9600
 MQTT_BROKER = "broker.benax.rw"
 MQTT_PORT = 1883
-MQTT_TOPIC = "tehilar/esp8266/dht"  # Subscribed by the dashboard
+MQTT_TOPIC = "tehila/esp8266/dht"   # Subscribed by the dashboard
 CANDIDATE_NAME = "Ruzindana Tehila"
 DEVICE_ID = "pc_serial_bridge_tehila"
 
