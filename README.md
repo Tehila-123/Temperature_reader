@@ -1,6 +1,6 @@
 # Temperature Display and MQTT Monitoring System
 
-This project is a complete Embedded Systems software integration that reads temperature from a physical sensor using an Arduino Uno, displays it alongside the candidate's name on a 16x2 Liquid Crystal Display (LCD) via an I2C adapter module, transmits the data via Serial to a PC-side bridge, and publishes the telemetry to an MQTT broker.
+This project is a complete Embedded Systems software integration that reads temperature from a physical digital sensor (DHT11) using an Arduino Uno, displays it alongside the candidate's name on a 16x2 Liquid Crystal Display (LCD) via an I2C adapter module, transmits the data via Serial to a PC-side bridge, and publishes the telemetry to an MQTT broker.
 
 The dashboard can then subscribe to the MQTT topic to plot the temperature in real time.
 
@@ -19,9 +19,9 @@ The dashboard can then subscribe to the MQTT topic to plot the temperature in re
 ## 🏗️ System Flow & Architecture
 
 ```
-[LM35 Temp Sensor] 
+[DHT11 Temp Sensor] 
        │
-       ▼ (Analog Voltage A0)
+       ▼ (Digital DATA Pin 7)
  [Arduino Uno] ──► [16x2 I2C LCD Display] (Displays Name & Temp)
        │
        ▼ (USB Serial @ 9600 Baud)
@@ -37,7 +37,7 @@ The dashboard can then subscribe to the MQTT topic to plot the temperature in re
 ```mermaid
 graph TD
     subgraph Hardware ["Microcontroller System"]
-        Sensor["Temperature Sensor (LM35)"] -->|Analog Read A0| Arduino["Arduino Uno"]
+        Sensor["Temperature Sensor (DHT11)"] -->|Digital DATA Pin 7| Arduino["Arduino Uno"]
         Arduino -->|I2C Interface A4/A5| LCD["16x2 I2C LCD Display"]
     end
 
@@ -60,12 +60,12 @@ graph TD
 
 ## 🔌 Hardware Connections
 
-### 1. LM35 Temperature Sensor to Arduino Uno
-| LM35 Pin | Description | Arduino Pin |
+### 1. DHT11 Sensor to Arduino Uno
+| DHT11 Module Pin | Description | Arduino Pin |
 |---|---|---|
-| **Pin 1 (VCC)** | Power Input (4V - 30V) | `5V` |
-| **Pin 2 (OUT)** | Analog Temperature Output | `A0` |
-| **Pin 3 (GND)** | Ground Reference | `GND` |
+| **VCC** | Power Input (+5V or +3.3V) | `5V` |
+| **GND** | Ground Reference | `GND` |
+| **DATA** | Digital Data Output | `Digital Pin 7` |
 
 ### 2. 16x2 LCD Display with I2C Module to Arduino Uno
 | I2C Module Pin | Description | Arduino Pin |
@@ -107,14 +107,17 @@ graph TD
 ## 💻 Arduino Uno Setup
 
 1. **Open** `temperature_reader.ino` in the Arduino IDE.
-2. Install the **LiquidCrystal_I2C** library if you haven't already:
+2. Install the **DHT Sensor Library** by Adafruit:
    - Go to **Sketch > Include Library > Manage Libraries...**
-   - Search for **LiquidCrystal_I2C** (by Frank de Brabander or Marco Schwartz) and click **Install**.
-3. Connect your Arduino Uno to your PC using the USB-A to USB-B cable.
-4. Select the board: **Tools > Board > Arduino Uno**.
-5. Select the port: **Tools > Port > (Select the COM port of your board)**.
-6. Click **Upload** (Ctrl + U).
-7. Once uploaded, open the **Serial Monitor** (Ctrl + Shift + M) set to `9600 baud` to verify temperature data is printed every 2 seconds.
+   - Search for **DHT sensor library** (by Adafruit) and click **Install**. 
+   - *Select "Install all" if it asks to install dependencies like Adafruit Unified Sensor.*
+3. Install the **LiquidCrystal_I2C** library:
+   - Search for **LiquidCrystal_I2C** (by Frank de Brabander) and click **Install**.
+4. Connect your Arduino Uno to your PC using the USB-A to USB-B cable.
+5. Select the board: **Tools > Board > Arduino Uno**.
+6. Select the port: **Tools > Port > (Select the COM port of your board)**.
+7. Click **Upload** (Ctrl + U).
+8. Once uploaded, open the **Serial Monitor** (Ctrl + Shift + M) set to `9600 baud` to verify temperature data is printed every 2 seconds.
 
 > [!NOTE]
 > *Candidate Name Display*: The name on the LCD is configured as `"Ruzindana Tehila"`. Since it is exactly 16 characters, it will display statically on Row 1. If you change `CANDIDATE_NAME` in the sketch to a name longer than 16 characters, the board will automatically start scrolling it horizontally.
