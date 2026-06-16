@@ -201,8 +201,8 @@ if __name__ == "__main__":
                     try:
                         temp_val = float(decoded)
                         
-                        # Validate range to avoid glitch readings
-                        if -40.0 <= temp_val <= 120.0:
+                        # Validate range to allow high diagnostic readings
+                        if -100.0 <= temp_val <= 1000.0:
                             last_temp = temp_val
                             msg_count += 1
                             last_update_str = time.strftime("%H:%M:%S")
