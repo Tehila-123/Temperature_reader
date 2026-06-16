@@ -31,17 +31,15 @@ const uint8_t LCD_COLUMNS = 16;
 const uint8_t LCD_ROWS = 2;
 
 // Timing intervals (milliseconds)
-const unsigned long SCROLL_INTERVAL = 350;    // Scroll name every 350ms
-const unsigned long TEMP_UPDATE_INTERVAL = 1000; // Update LCD temp display every 1s
-const unsigned long SERIAL_SEND_INTERVAL = 2000; // Send serial data every 2s
+const unsigned long SCROLL_INTERVAL = 350;       // Scroll name every 350ms
+const unsigned long TELEMETRY_INTERVAL = 2000;    // Read temp, update LCD, and send Serial every 2 seconds
 
 // Initialize I2C LCD object (Address, Columns, Rows)
 LiquidCrystal_I2C lcd(LCD_I2C_ADDRESS, LCD_COLUMNS, LCD_ROWS);
 
 // State variables for non-blocking timers
 unsigned long lastScrollTime = 0;
-unsigned long lastTempUpdateTime = 0;
-unsigned long lastSerialSendTime = 0;
+unsigned long lastTelemetryTime = 0;
 
 // Scrolling window state
 int scrollStartIndex = 0;
@@ -103,6 +101,7 @@ void updateNameRow() {
 
 /**
  * Updates the temperature display on the second row of the LCD.
+ * Formatted cleanly with proper padding and degree symbol.
  */
 void updateTemperatureRow() {
   lcd.setCursor(0, 1);
@@ -113,7 +112,12 @@ void updateTemperatureRow() {
   
   // Print degree symbol (char 223 in HD44780 standard font)
   lcd.print((char)223);
-  lcd.print("C  "); // Extra spaces to clear trailing digits if temperature changes size
+  lcd.print("C");
+  
+  // Fill the rest of the LCD line (16 chars) with spaces to clear trailing digits
+  // "Temp: " (6) + e.g. "24.5" (4) + "°" (1) + "C" (1) = 12 characters.
+  // We write 4 spaces to reach 16 characters.
+  lcd.print("    ");
 }
 
 // ==========================================
@@ -126,8 +130,6 @@ void setup() {
   
   // Initialize I2C LCD
   lcd.init();
-  // If your specific LiquidCrystal_I2C library requires begin(), uncomment the line below:
-  // lcd.begin();
   
   // Turn on the LCD backlight
   lcd.backlight();
@@ -135,10 +137,8 @@ void setup() {
   // Calculate candidate name length once
   nameLength = strlen(CANDIDATE_NAME);
   
-  // Initial temperature reading
+  // Initial telemetry read and display
   currentTemp = readLM35();
-  
-  // Initial display setup
   updateNameRow();
   updateTemperatureRow();
 }
@@ -146,23 +146,24 @@ void setup() {
 void loop() {
   unsigned long currentTime = millis();
   
-  // Task 1: Name Scrolling
+  // Task 1: Name Scrolling (Fast loop for smooth visual transition if name > 16 chars)
   if (currentTime - lastScrollTime >= SCROLL_INTERVAL) {
     lastScrollTime = currentTime;
     updateNameRow();
   }
   
-  // Task 2: Read Temperature & Update LCD Row 2
-  if (currentTime - lastTempUpdateTime >= TEMP_UPDATE_INTERVAL) {
-    lastTempUpdateTime = currentTime;
+  // Task 2: Telemetry Loop (Every 2 seconds)
+  // Reads temperature, updates LCD row 2, and transmits via Serial concurrently
+  if (currentTime - lastTelemetryTime >= TELEMETRY_INTERVAL) {
+    lastTelemetryTime = currentTime;
+    
+    // Read temperature sensor
     currentTemp = readLM35();
+    
+    // Update display in real-time
     updateTemperatureRow();
-  }
-  
-  // Task 3: Send Temperature to PC via Serial Communication
-  if (currentTime - lastSerialSendTime >= SERIAL_SEND_INTERVAL) {
-    lastSerialSendTime = currentTime;
-    // We send a single float value followed by a newline for easy parsing
+    
+    // Send reading to PC via USB Serial
     Serial.println(currentTemp, 1);
   }
 }
